@@ -1,5 +1,5 @@
 ;;;; package.lisp
 
 (defpackage #:cl-dot
-  (:use #:cl))
+  (:use #:cl #:esrap))
 
