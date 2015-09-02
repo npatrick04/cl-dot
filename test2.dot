@@ -1,0 +1,14 @@
+digraph test2 {
+  subgraph cluster_blah {
+    foo -> bar;
+  }
+
+  qux -> {qom;boff->bax}
+
+  foo[label="FOO"]
+
+  subgraph baz {
+    bar[label="bAR"]
+    bar[shape=box]
+  }
+}

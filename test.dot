@@ -1,0 +1,14 @@
+digraph 
+{
+  label="foo";  
+
+  subgraph cluster_bar
+  {
+    a;
+    b;
+  }->subgraph bar
+  {
+    c;
+    d;
+  }
+}
