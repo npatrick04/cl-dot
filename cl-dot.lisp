@@ -4,6 +4,8 @@
 
 (in-package #:cl-dot)
 
+(declaim (optimize debug))
+
 ;;; "cl-dot" goes here. Hacks and glory await!
 
 (defun valid-id? (str)
@@ -45,90 +47,6 @@
                   (intern (string-upcase id) :cl-dot))))
     (symbol id)))
 
-(defparameter *default-graph-attributes* ()) 
-(defparameter *default-node-attributes* ()) 
-(defparameter *default-edge-attributes* ()) 
-
-;; An environment that can be extended.  
-(defclass environment ()
-  ((graph-attributes :accessor graph-attributes
-		     :initarg :graph-attributes
-		     :initform *default-graph-attributes*)
-   (node-attributes  :accessor node-attributes
-		     :initarg :node-attributes
-		     :initform *default-node-attributes*)
-   (edge-attributes  :accessor edge-attributes
-		     :initarg :edge-attributes
-		     :initform *default-edge-attributes*)))
-
-
-
-(defgeneric get-attribute (place type attr))
-(defgeneric set-attribute (place type attr value))
-
-(defmethod get-attribute ((e environment) type attr)
-  (cdr (assoc attr (ecase type
-		     (graph (graph-attributes e))
-		     (node (node-attributes e))
-		     (edge (edge-attributes e)))
-	      :test #'equalp)))
-(defmethod set-attribute ((e environment) type attr value)
-  (let ((new-attributes
-	 (cons (cons attr value)
-	       (ecase type
-		 (graph (graph-attributes e))
-		 (node (node-attributes e))
-		 (edge (edge-attributes e))))))
-    (case type
-      (graph (setf (graph-attributes e) new-attributes))
-      (node (setf (node-attributes e) new-attributes))
-      (edge (setf (edge-attributes e) new-attributes))))
-  value)
-
-;; An attribute that is for the use by cl-dot
-(defstruct ancillary-attribute 
-  (value))
-(defgeneric get-ancillary-attribute (place type attr))
-(defgeneric set-ancillary-attribute (place type attr value))
-
-(defmethod get-ancillary-attribute ((e environment) type attr)
-  (get-attribute e type (make-ancillary-attribute :value attr)))
-(defmethod set-ancillary-attribute ((e environment) type attr value)
-  (set-attribute e type (make-ancillary-attribute :value attr) value))
-
-(defun augment-attributes (old-attributes new-attributes)
-  (append new-attributes old-attributes))
-
-(defun make-extended-environment (old-environment &key
-						    new-graph-attributes
-						    new-node-attributes
-						    new-edge-attributes)
-  "Given new attributes, return a new environment, now augmented."
-  (make-instance 'environment
-		 :graph-attributes (augment-attributes
-				    (graph-attributes old-environment)
-				    new-graph-attributes)
-		 :node-attributes (augment-attributes
-				   (node-attributes old-environment)
-				   new-node-attributes)
-		 :edge-attributes (augment-attributes
-				   (edge-attributes old-environment)
-				   new-edge-attributes)))
-(defun augment-environment (old-environment &key
-					      new-graph-attributes
-					      new-node-attributes
-					      new-edge-attributes)
-  "Prepend new attributes to the environment."
-  (setf (graph-attributes old-environment) (augment-attributes
-					    (graph-attributes old-environment)
-					    new-graph-attributes)
-	(node-attributes old-environment) (augment-attributes
-					   (node-attributes old-environment)
-					   new-node-attributes)
-	(edge-attributes old-environment) (augment-attributes
-					   (edge-attributes old-environment)
-					   new-edge-attributes)))
-
 ;; (defun print-alist (alist stream &optional (bracket t))
 ;;   (when alist
 ;;     (format stream "~:[~;[~]~{~A~^, ~}~:[~;]~]"
@@ -160,14 +78,14 @@
   ((environment :accessor environment
 		:initarg :environment
 		:initform (make-instance 'environment))))
-(defmethod get-ancillary-attribute ((sg subgraph) type attr)
-  (get-attribute (environment sg) type (make-ancillary-attribute :value attr)))
-(defmethod set-ancillary-attribute ((sg subgraph) type attr value)
-  (set-attribute (environment sg) type (make-ancillary-attribute :value attr) value))
 (defmethod get-attribute ((sg subgraph) type attr)
   (get-attribute (environment sg) type attr))
 (defmethod set-attribute ((sg subgraph) type attr value)
   (set-attribute (environment sg) type attr value))
+(defmethod get-ancillary-attribute ((sg subgraph) type attr)
+  (get-attribute (environment sg) type (make-ancillary-attribute :value attr)))
+(defmethod set-ancillary-attribute ((sg subgraph) type attr value)
+  (set-attribute (environment sg) type (make-ancillary-attribute :value attr) value))
 
 ;; (defmethod initialize-instance :after ((object subgraph) &key &allow-other-keys)
 ;;   (setf (subgraph-statements object)
@@ -209,7 +127,7 @@
    (nodes :accessor graph-nodes :initform (make-hash-table :test 'equal))))
 (defmethod initialize-instance :after ((g graph) &key &allow-other-keys)
   (set-ancillary-attribute g 'graph 'nodes (graph-nodes g))
-  (set-ancillary-attribute g 'graph 'path '(:root))
+  (set-ancillary-attribute g 'graph 'path (list (or (id g) :root)))
   (set-ancillary-attribute g 'graph 'root g))
 
 ;;; A digraph uses ->
@@ -222,50 +140,32 @@
    (edges :accessor node-edges :initarg :edges :initform ())))
 
 (defmethod get-attribute ((n node) type attr)
-  (unless (eq type 'node) (error "Type must be 'node"))
+  (declare (ignore type))
   (cdr (assoc attr (attributes n) :test #'equalp)))
 (defmethod set-attribute ((n node) type attr value)
-  (unless (eq type 'node) (error "Type must be 'node"))
+  (declare (ignore type))
   (push (cons attr value) (attributes n)))
 (defmethod get-ancillary-attribute ((n node) type attr)
   (get-attribute n type (make-ancillary-attribute :value attr)))
 (defmethod set-ancillary-attribute ((n node) type attr value)
   (set-attribute n type (make-ancillary-attribute :value attr) value))
 
-(defmethod initialize-instance :after ((n node) &key
-						  attributes
-						  environment
-						  &allow-other-keys)
-  (when environment
-    (setf (attributes n) (append attributes (node-attributes environment)))
-    (set-ancillary-attribute n 'node 'path
-			     (cons (id n) (get-ancillary-attribute environment
-								   'graph 'path)))
-    (set-ancillary-attribute n 'node 'root (get-ancillary-attribute environment
-								    'graph 'root))
-    (let ((node-set (get-ancillary-attribute environment 'graph 'nodes)))
-      (setf (gethash (id n) node-set) n))))
-
-;; (defmethod initialize-instance :after ((object node) &key &allow-other-keys)
-;;; Perhaps set a reference to a hash of all nodes...
-;;   (setf (get (id->symbol (id object)) 'node) object))
-
-;; (defmethod print-object :after ((object environment) stream)
-;;   (print-alist (attributes object) stream))
-
-;; (defmethod print-object ((object node) stream)
-;;   (format stream "~A" (string-downcase (id object))))
-
-(defun node-or-subgraph? (element)
-  (or (typep element 'node)
-      (typep element 'subgraph)))
-
-(defun node-or-subgraph-list? (element)
-  (format t "check node-or-subgraph-list?~%")
-  (every #'node-or-subgraph? element))
-
-(deftype node-or-subgraph-list ()
-  `(satisfies node-or-subgraph-list?))
+(defmethod initialize-instance :around ((n node) &key
+					id
+					attributes
+					environment
+					&allow-other-keys)
+  (let ((new-attributes (list (cons 'path (cons id
+						(get-ancillary-attribute environment
+									 'graph 'path)))
+			      (cons 'root (get-ancillary-attribute environment
+								   'graph 'root))))
+	(node-set (get-ancillary-attribute environment 'graph 'nodes)))
+    (setf (gethash id node-set)
+	  (call-next-method n
+			    :attributes (append attributes
+						new-attributes
+						(node-attributes environment))))))
 
 (defclass edge ()
   ((attributes :accessor attributes
@@ -275,10 +175,10 @@
 		:initform (error "Need a destination")
 		:initarg :destination)))
 (defmethod get-attribute ((n edge) type attr)
-  (unless (eq type 'edge) (error "Type must be 'edge"))
+  (declare (ignore type))
   (cdr (assoc attr (attributes n) :test #'equalp)))
 (defmethod set-attribute ((n edge) type attr value)
-  (unless (eq type 'edge) (error "Type must be 'edge"))
+  (declare (ignore type))
   (push (cons attr value) (attributes n)))
 (defmethod get-ancillary-attribute ((n edge) type attr)
   (get-attribute n type (make-ancillary-attribute :value attr)))
@@ -289,19 +189,9 @@
 						  attributes
 						  environment
 						  &allow-other-keys)
-  (declare (optimize debug))
-  (when environment
-    (setf (attributes e) (append attributes (edge-attributes environment)))
-    (set-ancillary-attribute e 'edge 'root (get-ancillary-attribute environment
-								    'graph 'root))
-    ;; (unless (typep (get-ancillary-attribute environment 'graph 'root) 'digraph)
-    ;;   ;; It's an undirected graph...add an edge in the other direction
-    ;;   (push (make-instance 'edge
-    ;; 			   :environment environment
-    ;; 			   :destination source
-    ;; 			   :attributes attributes)
-    ;; 	    (node-edges (destination e))))
-    )
+  (setf (attributes e) (append attributes (edge-attributes environment)))
+  (set-ancillary-attribute e 'edge 'root (get-ancillary-attribute environment
+								  'graph 'root))
   (when source
     (push e (node-edges source))
     (when environment
@@ -323,10 +213,10 @@
 					    'graph
 					    'nodes)))
 
-(let* ((g (make-instance 'digraph))
-       (n1 (make-instance 'node :id "foo" :environment (environment g)))
-       (n2 (make-instance 'node :id "bar" :environment (environment g)))
-       (e (make-instance 'edge :source n1 :destination n2 :environment (environment g))))
-  (declare (ignorable e))
-  g)
+;; (let* ((g (make-instance 'digraph))
+;;        (n1 (make-instance 'node :id "foo" :environment (environment g)))
+;;        (n2 (make-instance 'node :id "bar" :environment (environment g)))
+;;        (e (make-instance 'edge :source n1 :destination n2 :environment (environment g))))
+;;   (declare (ignorable e))
+;;   g)
 

@@ -4,15 +4,18 @@
 
 (declaim (optimize debug))
 
-(declaim (special *environment*))
+(declaim (special *environment* *graph*))
 (defvar *environment* nil)
+(defvar *graph* nil)
 
 ;;; Utility rules
 
-(defrule whitespace (+ (or #\space #\tab #\newline))
+(defrule whitespace (+ (or #\space #\tab))
+  (:constant nil))
+(defrule whitespace/nl (+ (or #\space #\tab #\newline))
   (:constant nil))
 
-(defrule id-type (and (? whitespace)
+(defrule id-type (and (? whitespace/nl)
 		      (? #\") (+ (alphanumericp character))  (? #\"))
   (:destructure (w ql s qr)
 		(declare (ignore w ql qr))
@@ -20,16 +23,17 @@
 
 ;;; Dot Rules
 
-(defrule strict (and (? whitespace) "strict")
+(defrule strict (and (? whitespace/nl) "strict")
   (:constant :strict))
-(defrule graph-type (and (? whitespace) "graph")
+(defrule graph-type (and (? whitespace/nl) "graph")
   (:constant :graph))
-(defrule digraph-type (and (? whitespace) "digraph")
+(defrule digraph-type (and (? whitespace/nl) "digraph")
   (:constant :digraph))
 
 (defrule graph-spec (and (? strict)
 			 (or graph-type digraph-type)
-			 (? id-type) (? whitespace))
+			 (? id-type)
+			 (? whitespace/nl))
   (:destructure (strict gtype id? w1 &bounds start end)
 		(declare (ignore w1))
 		;; Now we know the type of graph we need to create.
@@ -47,15 +51,17 @@
 			  start end)
 		  graph)))
 
-(defrule scope (and (and #\{ (? whitespace))
-		    stmt-list (? whitespace)
-		    (and #\} (? whitespace)))
+(defrule scope (and (and #\{ (? whitespace/nl))
+		    stmt-list (? whitespace/nl)
+		    (and #\} (? whitespace/nl)))
   (:function second)
   (:around ()
 	   (let ((*environment* (make-extended-environment
 				 *environment*)))
-	     (format t "Extend environment~%")
-	     (call-transform))))
+	     (format t "Scope, Extend environment~%")
+	     (call-transform)
+	     (format t "Scope, done extending~%")
+	     )))
 
 (defrule graph-structure (and graph-spec scope)
   (:function first)
@@ -70,12 +76,13 @@
 		(format t "{~D, ~D}~%" car cdr)
 		(cons car cdr)))
 
-(defrule stmt (and (? whitespace)
+(defrule stmt (and (? whitespace/nl)
 		   (or attr-stmt
-		       ;edge-stmt
+		       subgraph
+					;edge-stmt
 		       node-stmt
-		       ;(and id-type (? whitespace) #\= (? whitespace) id-type)
-		       ;; subgraph
+		       ;(and id-type (? whitespace/nl) #\= (? whitespace/nl) id-type)
+		       
 		       ))
   (:destructure (w stmt)
 		(declare (ignore w))
@@ -104,9 +111,9 @@
 		(declare (ignore bl br))
 		(append alist rest)))
 (defrule a-list (and id-type
-		     (? whitespace) #\=
+		     (? whitespace/nl) #\=
 		     id-type
-		     (? whitespace) (? (or #\; #\,)) (? a-list))
+		     (? whitespace/nl) (? (or #\; #\,)) (? a-list))
   (:destructure (id1 w1 eq id2 w2 term rest)
 		(declare (ignore w1 w2 eq term))
 		(cons (cons id1 id2) rest)))
@@ -119,10 +126,11 @@
 		  (let ((lhs-node (get-node-by-id g lhs)))
 		    (dolist (rhs rhs)
 		      
-		      (push (make-instance 'edge
-					   :environment *environment*
-					   :source lhs
-					   :destination )))))
+		      ;; (push (make-instance 'edge
+		      ;; 			   :environment *environment*
+		      ;; 			   :source lhs
+		      ;; 			   :destination ))
+		      )))
     (list lhs rhs attrs)))
 (defrule edge-op (or "--" "->")
   (:text t))
@@ -146,7 +154,23 @@
     id))
 (defrule port (or (and #\: id-type (? (and #\: compass-pt)))
 		  (and #\: compass-pt)))
-(defrule subgraph (and (? (and "subgraph" (? id-type))) #\{ stmt-list (? whitespace) #\}))
+(defrule subgraph-identifier "subgraph" (:constant 'subgraph))
+
+(defrule subgraph-spec (and (? (and subgraph-identifier (? id-type)
+			       (? whitespace/nl))))
+  (:destructure (sg-id)
+		(format t "Create subgraph~%")
+		(make-instance 'subgraph
+			       :id (second sg-id)
+			       :environment (setf *environment*
+						  (make-extended-environment *environment*))))
+  ;; (:around ()
+  ;; 	   (let ((*environment* (make-extended-environment
+  ;; 				 *environment*)))
+  ;; 	     (format t "subgraph around, extending env~%")
+  ;; 	     (call-transform)))
+  )
+(defrule subgraph (and subgraph-spec scope))
 (defrule compass-pt (or "ne" "nw" "n" "se" "sw" "s" "e" "w" "c" #\_)
   (:text t))
 
@@ -156,6 +180,7 @@
 (parse 'graph-structure "digraph bar { baz[shape=box]; }" :junk-allowed t)
 (parse 'graph-structure "digraph
 {
+  node[shape=diamond;style=dashed];
   foo;
   bar;
   baz[shape=box];

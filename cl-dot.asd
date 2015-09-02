@@ -7,6 +7,7 @@
   :serial t
   :depends-on (:esrap)
   :components ((:file "package")
+	       (:file "environment")
                (:file "cl-dot")
 	       (:file "read-dot")))
 
