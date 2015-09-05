@@ -11,15 +11,47 @@
 ;;; Utility rules
 
 (defrule whitespace (+ (or #\space #\tab))
-  (:constant nil))
+  (:text t))
 (defrule whitespace/nl (+ (or #\space #\tab #\newline))
-  (:constant nil))
+  (:text t))
 
-(defrule id-type (and (? whitespace/nl)
-		      (? #\") (+ (alphanumericp character))  (? #\"))
+(defrule string-type (and (? whitespace/nl) (+ (alphanumericp character)))
+  (:destructure (w s)
+		(declare (ignore w))
+		(text s)))
+
+(defrule quoted-string-type (and (? whitespace/nl)
+				 (? #\")
+				 (+ (or whitespace/nl
+					(alphanumericp character)))
+				 (? #\"))
   (:destructure (w ql s qr)
 		(declare (ignore w ql qr))
 		(text s)))
+
+(defrule html-string (and #\< (+ (or whitespace/nl (alphanumericp character))) #\>)
+  (:text t))
+
+(defrule digit (character-ranges (#\0 #\9)))
+
+(defrule integer/str (+ digit)
+  (:text t))
+
+(defrule integer integer/str
+  (:lambda (int-str)
+	   (parse-integer int-str)))
+
+(defrule numeral/str (and (? #\-)
+			  (or (and #\. integer/str)
+			      (and integer/str (? (and #\. (* digit))))))
+  (:text t))
+
+(defrule numeral numeral/str
+  (:function read-from-string))
+
+
+
+(defrule id-type (or string-type numeral quoted-string-type html-string))
 
 ;;; Dot Rules
 
@@ -174,14 +206,16 @@
 (defrule compass-pt (or "ne" "nw" "n" "se" "sw" "s" "e" "w" "c" #\_)
   (:text t))
 
+(parse 'attr-list "[shape=diamond,style=blah,number=3.14,foo=bar]")
+
 (parse 'strict "strict")
 (parse 'graph-structure "strict digraph bar { baz; }")
 (parse 'graph-structure "strict digraph bar { baz; }" :junk-allowed t)
 (parse 'graph-structure "digraph bar { baz[shape=box]; }" :junk-allowed t)
-(parse 'graph-structure "digraph
-{
-  node[shape=diamond;style=dashed];
-  foo;
-  bar;
-  baz[shape=box];
-}")
+;; (parse 'graph-structure "digraph
+;; {
+;;   node[shape=diamond;style=dashed];
+;;   foo;
+;;   bar;
+;;   baz[shape=box];
+;; }")
