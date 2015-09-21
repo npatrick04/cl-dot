@@ -51,7 +51,7 @@
 
 
 
-(defrule id-type (or string-type numeral quoted-string-type html-string))
+(defrule id-type (or numeral string-type quoted-string-type html-string))
 
 ;;; Dot Rules
 
