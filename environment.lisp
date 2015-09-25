@@ -6,7 +6,10 @@
 
 ;; An environment that can be extended.  
 (defclass environment ()
-  ((graph-attributes :accessor graph-attributes
+  ((inherited-env :accessor inherited-env
+		  :initarg :inherited-env
+		  :initform nil)
+   (graph-attributes :accessor graph-attributes
 		     :initarg :graph-attributes
 		     :initform *default-graph-attributes*)
    (node-attributes  :accessor node-attributes
@@ -15,6 +18,13 @@
    (edge-attributes  :accessor edge-attributes
 		     :initarg :edge-attributes
 		     :initform *default-edge-attributes*)))
+
+(defmethod print-object ((object environment) stream)
+  (print-unreadable-object (object stream :type t :identity t)
+			   (format stream "G:~D,N:~D,E:~D"
+				   (length (graph-attributes object))
+				   (length (node-attributes object))
+				   (length (edge-attributes object)))))
 
 ;;; A user-specified type of attribute
 (defgeneric get-attribute (place type attr)
@@ -26,6 +36,9 @@ attribute stored by the key attr."))
 a type of 'graph, 'node, or 'edge, store value in the
 attribute stored by the key attr."))
 
+(defmethod get-attribute (place type attr) nil)
+(defmethod set-attribute (place type attr value) nil)
+
 ;;; An attribute that is for the use by cl-dot
 (defstruct ancillary-attribute (value))
 (defgeneric get-ancillary-attribute (place type attr)
@@ -36,11 +49,16 @@ is converted into an ancillary-attribute type."))
 is converted into an ancillary-attribute type."))
 
 (defmethod get-attribute ((e environment) type attr)
-  (cdr (assoc attr (ecase type
-		     (graph (graph-attributes e))
-		     (node (node-attributes e))
-		     (edge (edge-attributes e)))
-	      :test #'equalp)))
+  (let ((value (cdr (assoc attr (ecase type
+				  (graph (graph-attributes e))
+				  (node (node-attributes e))
+				  (edge (edge-attributes e)))
+			   :test #'equalp))))
+    (if value
+	value
+      (get-attribute (inherited-env e)
+		     type
+		     attr))))
 
 (defmethod set-attribute ((e environment) type attr value)
   (ecase type
@@ -63,26 +81,21 @@ is converted into an ancillary-attribute type."))
 						    new-edge-attributes)
   "Given new attributes, return a new environment, now augmented."
   (make-instance 'environment
-		 :graph-attributes (augment-attributes
-				    (graph-attributes old-environment)
-				    new-graph-attributes)
-		 :node-attributes (augment-attributes
-				   (node-attributes old-environment)
-				   new-node-attributes)
-		 :edge-attributes (augment-attributes
-				   (edge-attributes old-environment)
-				   new-edge-attributes)))
-(defun augment-environment (old-environment &key
-					      new-graph-attributes
-					      new-node-attributes
-					      new-edge-attributes)
-  "Prepend new attributes to the environment."
-  (setf (graph-attributes old-environment) (augment-attributes
-					    (graph-attributes old-environment)
-					    new-graph-attributes)
-	(node-attributes old-environment) (augment-attributes
-					   (node-attributes old-environment)
-					   new-node-attributes)
-	(edge-attributes old-environment) (augment-attributes
-					   (edge-attributes old-environment)
-					   new-edge-attributes)))
+		 :inherited-env old-environment
+		 :graph-attributes new-graph-attributes
+		 :node-attributes new-node-attributes
+		 :edge-attributes new-edge-attributes))
+;; (defun augment-environment (old-environment &key
+;; 					      new-graph-attributes
+;; 					      new-node-attributes
+;; 					      new-edge-attributes)
+;;   "Prepend new attributes to the environment."
+;;   (setf (graph-attributes old-environment) (augment-attributes
+;; 					    (graph-attributes old-environment)
+;; 					    new-graph-attributes)
+;; 	(node-attributes old-environment) (augment-attributes
+;; 					   (node-attributes old-environment)
+;; 					   new-node-attributes)
+;; 	(edge-attributes old-environment) (augment-attributes
+;; 					   (edge-attributes old-environment)
+;; 					   new-edge-attributes)))

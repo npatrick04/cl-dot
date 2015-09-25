@@ -15,7 +15,7 @@
 (defrule whitespace/nl (+ (or #\space #\tab #\newline))
   (:text t))
 
-(defrule string-type (and (? whitespace/nl) (+ (alphanumericp character)))
+(defrule string-type (and (? whitespace/nl) (+ (or (alphanumericp character) #\_)))
   (:destructure (w s)
 		(declare (ignore w))
 		(text s)))
@@ -23,6 +23,7 @@
 (defrule quoted-string-type (and (? whitespace/nl)
 				 (? #\")
 				 (+ (or whitespace/nl
+					#\_
 					(alphanumericp character)))
 				 (? #\"))
   (:destructure (w ql s qr)
@@ -86,17 +87,22 @@
 (defrule scope (and (and #\{ (? whitespace/nl))
 		    stmt-list (? whitespace/nl)
 		    (and #\} (? whitespace/nl)))
-  (:function second)
+  (:destructure (open stmts ws close)
+		(declare (ignore open ws close))
+		(format t "Returning scope: ~A~%" stmts)
+		stmts)
   (:around ()
+	   (format t "Scope, Extend environment ~A~%" *environment*)
 	   (let ((*environment* (make-extended-environment
 				 *environment*)))
-	     (format t "Scope, Extend environment~%")
+	     (format t "      Extend environment now ~A~%" *environment*)
 	     (call-transform)
-	     (format t "Scope, done extending~%")
-	     )))
+	     (format t "Scope, done extending ~A~%" *environment*))
+	   (format t "       Environment back to ~A~%" *environment*)))
 
 (defrule graph-structure (and graph-spec scope)
-  (:function first)
+  (:destructure (graph contents)
+		(list graph contents))
   (:around ()
 	   (let ((*environment* (make-instance 'environment)))
 	     (format t "Make new environment~%")
@@ -105,20 +111,21 @@
 (defrule stmt-list (and stmt (? #\;) (? stmt-list))
   (:destructure (car semi cdr)
 		(declare (ignore semi))
-		(format t "{~D, ~D}~%" car cdr)
-		(cons car cdr)))
-
+		(format t "(~{~A ~})~%" (cons car cdr))
+		(when car		  
+		  (cons car cdr))))
 (defrule stmt (and (? whitespace/nl)
-		   (or attr-stmt
-		       subgraph
+		   (?
+		    (or attr-stmt
+			subgraph
 					;edge-stmt
-		       node-stmt
-		       ;(and id-type (? whitespace/nl) #\= (? whitespace/nl) id-type)
-		       
-		       ))
+			node-stmt
+					;(and id-type (? whitespace/nl) #\= (? whitespace/nl) id-type)
+			
+			)))
   (:destructure (w stmt)
 		(declare (ignore w))
-		(print stmt)
+;;		(print stmt)
 		stmt))
 
 (defrule node-attr "node" (:constant 'node))
@@ -173,11 +180,13 @@
     (cons rhs rest)))
 (defrule node-stmt (and node-id (? attr-list))
   (:destructure (id attrs)
-		(format t "node ~A~%" id)
-    (make-instance 'node
-		   :id id
-		   :environment *environment*
-		   :attributes attrs)))
+		(let ((node (make-instance 'node
+					   :id id
+					   :environment *environment*
+					   :attributes attrs)))
+		  (format t "node ~A, ~D attributes~%" id
+			  (length (attributes node)))
+		  node)))
 
 (defrule node-id (and id-type (? port))
   (:destructure (id port)
@@ -190,10 +199,11 @@
 
 (defrule subgraph-spec (and (? (and subgraph-identifier (? id-type)
 			       (? whitespace/nl))))
-  (:destructure (sg-id)
-		(format t "Create subgraph~%")
+  (:destructure ((sg id wt))
+		(declare (ignore sg wt))
+		(format t "Create subgraph ~A~%" id)
 		(make-instance 'subgraph
-			       :id (second sg-id)
+			       :id id
 			       :environment (setf *environment*
 						  (make-extended-environment *environment*))))
   ;; (:around ()
@@ -212,10 +222,16 @@
 (parse 'graph-structure "strict digraph bar { baz; }")
 (parse 'graph-structure "strict digraph bar { baz; }" :junk-allowed t)
 (parse 'graph-structure "digraph bar { baz[shape=box]; }" :junk-allowed t)
-;; (parse 'graph-structure "digraph
-;; {
-;;   node[shape=diamond;style=dashed];
-;;   foo;
-;;   bar;
-;;   baz[shape=box];
-;; }")
+
+(parse 'graph-structure "digraph
+{
+  node[shape=diamond;style=dashed];
+  foo;
+  bar[shape=box];
+  subgraph cluster_qux
+  {
+    node[fill=yes];
+    qux[label=\"qux\"];
+  }
+  baz;
+}")

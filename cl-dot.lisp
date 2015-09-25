@@ -87,6 +87,10 @@
 (defmethod set-ancillary-attribute ((sg subgraph) type attr value)
   (set-attribute (environment sg) type (make-ancillary-attribute :value attr) value))
 
+(defmethod initialize-instance :after ((sg subgraph) &key environment &allow-other-keys)
+  ;(call-next-method sg :environment (make-extended-environment environment))
+  (set-ancillary-attribute sg 'graph 'path (cons (id sg)
+						 (get-ancillary-attribute sg 'graph 'path))))
 ;; (defmethod initialize-instance :after ((object subgraph) &key &allow-other-keys)
 ;;   (setf (subgraph-statements object)
 ;; 	(mapcar #'normalize-statement (subgraph-statements object))))
@@ -136,12 +140,17 @@
 
 ;;; The node holds its unique attributes...and points to the inherited ones after it. 
 (defclass node (identified)
-  ((attributes :accessor attributes :initarg :attributes)
+  ((inherited-env :accessor inherited-env
+		  :initarg :inherited-env
+		  :initform nil)
+   (attributes :accessor attributes :initarg :attributes)
    (edges :accessor node-edges :initarg :edges :initform ())))
 
 (defmethod get-attribute ((n node) type attr)
   (declare (ignore type))
-  (cdr (assoc attr (attributes n) :test #'equalp)))
+  (let ((result (cdr (assoc attr (attributes n) :test #'equalp))))
+    (if result result
+      (get-attribute (inherited-env n) 'node attr))))
 (defmethod set-attribute ((n node) type attr value)
   (declare (ignore type))
   (push (cons attr value) (attributes n)))
@@ -163,6 +172,8 @@
 	(node-set (get-ancillary-attribute environment 'graph 'nodes)))
     (setf (gethash id node-set)
 	  (call-next-method n
+			    :id id
+			    :environment environment
 			    :attributes (append attributes
 						new-attributes
 						(node-attributes environment))))))
