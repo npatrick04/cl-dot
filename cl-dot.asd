@@ -9,5 +9,6 @@
   :components ((:file "package")
 	       (:file "environment")
                (:file "cl-dot")
-	       (:file "read-dot")))
+               (:file "print")
+	       (:file "read")))
 
