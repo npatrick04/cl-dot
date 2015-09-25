@@ -47,37 +47,20 @@
                   (intern (string-upcase id) :cl-dot))))
     (symbol id)))
 
-;; (defun print-alist (alist stream &optional (bracket t))
-;;   (when alist
-;;     (format stream "~:[~;[~]~{~A~^, ~}~:[~;]~]"
-;;             bracket
-;;             (loop for (attr . value) in alist
-;;                collect (format nil "~{~A=\"~A\"~}"
-;;                                (mapcar #'symbol->id (list attr value))))
-;;             bracket)))
-
-;; (defun normalize-statement (statement)
-;;   (etypecase statement
-;;     (string
-;;      (let ((arrow (search "->" statement)))
-;;        (if arrow
-;;            (make-instance 'edge :nodes (list (normalize-statement
-;;                                               (subseq statement 0 arrow))
-;;                                              (normalize-statement
-;;                                               (subseq statement (+ 2 arrow)))))
-;;            (make-instance 'node :id (string-downcase statement)))))
-;;     (cons
-;;      (print-alist (list statement) nil nil))
-;;     (symbol
-;;      (normalize-statement (symbol-name statement)))))
+;;; Does this do anything?  I want a sentinel kind of marker.
+(deftype anonymous ()
+  '(member +anonymous+))
+(declaim (type anonymous +anonymous+))
+(defconstant +anonymous+ '+anonymous+)
 
 (defclass identified ()
-  ((id :reader id :initarg :id :initform nil :type (or nil id-type))))
+  ((id :reader id :initarg :id :initform nil :type (or nil anonymous id-type))))
 
 (defclass subgraph (identified)
   ((environment :accessor environment
 		:initarg :environment
-		:initform (make-instance 'environment))))
+		:initform (make-instance 'environment)))
+  (:default-initargs :id +anonymous+))
 (defmethod get-attribute ((sg subgraph) type attr)
   (get-attribute (environment sg) type attr))
 (defmethod set-attribute ((sg subgraph) type attr value)
@@ -86,40 +69,6 @@
   (get-attribute (environment sg) type (make-ancillary-attribute :value attr)))
 (defmethod set-ancillary-attribute ((sg subgraph) type attr value)
   (set-attribute (environment sg) type (make-ancillary-attribute :value attr) value))
-
-;; (defmethod initialize-instance :after ((object subgraph) &key &allow-other-keys)
-;;   (setf (subgraph-statements object)
-;; 	(mapcar #'normalize-statement (subgraph-statements object))))
-;; (defmethod initialize-instance :around ((object subgraph) &key
-;; 							    environment
-;; 							    statements
-;; 							    &allow-other-keys)
-;;   (let ((normalized-statements (mapcar #'normalize-statement statements)))
-;;     (if environment
-;; 	(call-next-method object
-;; 			  :environment (make-extended-environment environment)
-;; 			  :statements normalized-statements)
-;; 	(call-next-method object
-;; 			  :statements normalized-statements))))
-
-
-;; (defmethod print-object ((object subgraph) stream)
-;;   (print-unreadable-object (object stream :type t :identity t))
-;;   ;; (format stream
-;;   ;;         "~:[~;strict ~]~:[~:[subgraph~;graph~]~;~*digraph~] ~:[~;~:*~A ~]~%~
-;;   ;;          {~%~
-;;   ;;            ~:[~;  ~:*node ~A;~%~]~
-;;   ;;            ~:[~;  ~:*edge ~A;~%~]~
-;;   ;;            ~{  ~A;~%~}~
-;;   ;;          }~%"
-;;   ;;         (graph-strict object)
-;;   ;;         (typep object 'digraph)
-;;   ;;         (typep object 'graph)
-;;   ;;         (when (id object) (string-downcase (id object)))
-;;   ;;         (when (node-attrs object) (print-alist (node-attrs object) nil))
-;;   ;;         (when (edge-attrs object) (print-alist (edge-attrs object) nil))
-;;   ;;         (statements object))
-;;   )
 
 ;;; A graph uses --
 (defclass graph (subgraph)
@@ -150,22 +99,20 @@
 (defmethod set-ancillary-attribute ((n node) type attr value)
   (set-attribute n type (make-ancillary-attribute :value attr) value))
 
-(defmethod initialize-instance :around ((n node) &key
-					id
-					attributes
-					environment
-					&allow-other-keys)
-  (let ((new-attributes (list (cons 'path (cons id
-						(get-ancillary-attribute environment
-									 'graph 'path)))
-			      (cons 'root (get-ancillary-attribute environment
-								   'graph 'root))))
-	(node-set (get-ancillary-attribute environment 'graph 'nodes)))
-    (setf (gethash id node-set)
-	  (call-next-method n
-			    :attributes (append attributes
-						new-attributes
-						(node-attributes environment))))))
+(defmethod initialize-instance :after ((n node) &key
+                                                  (id (error "Nodes need IDs"))
+                                                  (environment (error "Nodes must be created within an environment."))
+                                                  &allow-other-keys)
+  ;; Get the graph path, set the node attribute for path with its id
+  ;; Set the root attribute to the graph being constructed
+  (set-ancillary-attribute n 'node 'path
+                           (cons id (get-ancillary-attribute environment 'graph 'path)))
+  (set-ancillary-attribute n 'node 'root
+                           (get-ancillary-attribute environment
+                                                    'graph 'root))
+
+  ;; Set the id as the key to retrieve this node
+  (setf (gethash id (get-ancillary-attribute environment 'graph 'nodes)) n))
 
 (defclass edge ()
   ((attributes :accessor attributes
@@ -184,29 +131,29 @@
   (get-attribute n type (make-ancillary-attribute :value attr)))
 (defmethod set-ancillary-attribute ((n edge) type attr value)
   (set-attribute n type (make-ancillary-attribute :value attr) value))
+
 (defmethod initialize-instance :after ((e edge) &key
-						  source
+						  (source (error "Edges must have a source."))
 						  attributes
-						  environment
+						  (environment (error "Edges must be constructed within an environment."))
 						  &allow-other-keys)
+  ;; Append the edge attributes to the specific attributes for this edge.
   (setf (attributes e) (append attributes (edge-attributes environment)))
+
+  ;; Set the root attribute to the graph being constructed.
   (set-ancillary-attribute e 'edge 'root (get-ancillary-attribute environment
 								  'graph 'root))
-  (when source
-    (push e (node-edges source))
-    (when environment
-      (unless (typep (get-ancillary-attribute environment 'graph 'root) 'digraph)
-	;; It's an undirected graph...add an edge in the other direction
-	(push (make-instance 'edge
-			     :environment environment
-			     :destination source
-			     :attributes attributes)
-	      (node-edges (destination e)))))))
-;; (defmethod print-object ((object edge) stream)
-;;   (format stream "~A -> ~A"
-;;           (string-downcase (id (car (nodes object))))
-;;           (string-downcase (id (cadr (nodes object))))))
-					;TODO: add attributes
+
+  ;; Add to the node's adjacency list.
+  (push e (node-edges source))
+
+  (unless (typep (get-ancillary-attribute environment 'graph 'root) 'digraph)
+    ;; It's an undirected graph...add an edge in the other direction
+    (push (make-instance 'edge
+                         :environment environment
+                         :destination source
+                         :attributes attributes)
+          (node-edges (destination e)))))
 
 (defun get-node-by-id (graph node-id)
   (gethash node-id (get-ancillary-attribute graph

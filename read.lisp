@@ -4,9 +4,8 @@
 
 (declaim (optimize debug))
 
-(declaim (special *environment* *graph*))
+(declaim (special *environment*))
 (defvar *environment* nil)
-(defvar *graph* nil)
 
 ;;; Utility rules
 
@@ -56,8 +55,7 @@
 		    (and #\} (? whitespace/nl)))
   (:function second)
   (:around ()
-	   (let ((*environment* (make-extended-environment
-				 *environment*)))
+	   (let ((*environment* (make-extended-environment *environment*)))
 	     (format t "Scope, Extend environment~%")
 	     (call-transform)
 	     (format t "Scope, done extending~%")
@@ -162,15 +160,12 @@
 		(format t "Create subgraph~%")
 		(make-instance 'subgraph
 			       :id (second sg-id)
-			       :environment (setf *environment*
-						  (make-extended-environment *environment*))))
-  ;; (:around ()
-  ;; 	   (let ((*environment* (make-extended-environment
-  ;; 				 *environment*)))
-  ;; 	     (format t "subgraph around, extending env~%")
-  ;; 	     (call-transform)))
-  )
-(defrule subgraph (and subgraph-spec scope))
+			       :environment (make-extended-environment *environment*))))
+(defrule subgraph (and subgraph-spec scope)
+  (:destructure (spec scope)
+                (format t "Subgraph spec: ~A~%Scope: ~A~%" spec scope)
+                scope))
+
 (defrule compass-pt (or "ne" "nw" "n" "se" "sw" "s" "e" "w" "c" #\_)
   (:text t))
 
@@ -183,5 +178,12 @@
   node[shape=diamond;style=dashed];
   foo;
   bar;
+  baz[shape=box];
+}")
+(parse 'graph-structure "digraph
+{
+  node[shape=diamond;style=dashed];
+  foo;
+  subgraph blah { node[style=\"solid\"]; bar; }
   baz[shape=box];
 }")
