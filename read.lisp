@@ -72,7 +72,15 @@
   "[id1 = something; id2=else] => '((id1 . something) (id2 . else))"
   (declare (ignore char))
   (with-nothing-reading #\=
-    (plist-to-alist (read-delimited-list #\] stream))))
+    (with-nothing-reading #\;
+      (plist-to-alist (read-delimited-list #\] stream)))))
+
+(defmacro without-list-reading (&body body)
+  ;; TODO
+  ;; `(with-reader-macros ((#\[ #'read-attribute-list)
+  ;;                       (#\] (get-macro-character #\))))
+  ;;    ,@body)
+  )
 
 (defmacro with-square-list-reading (&body body)
   `(with-reader-macros ((#\[ #'read-attribute-list)
