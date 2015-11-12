@@ -1,20 +1,22 @@
 ;;;; package.lisp
 
 (defpackage #:cl-dot
-  (:use #:cl #:esrap)
+  (:use #:cl ;; #:esrap
+        )
   (:export
-   #:id
+   ;; #:id
    
-   #:get-attribute
-   #:set-attribute
-   #:get-ancillary-attribute
-   #:set-ancillary-attribute
+   ;; #:get-attribute
+   ;; #:set-attribute
+   ;; #:get-ancillary-attribute
+   ;; #:set-ancillary-attribute
 
-   #:subgraph
-   #:graph
-   #:digraph
-   #:node
-   #:edge
+   ;; #:subgraph
+   ;; #:graph
+   ;; #:digraph
+   ;; #:node
+   ;; #:edge
 
-   #:get-node-by-id))
+   ;; #:get-node-by-id
+   ))
 

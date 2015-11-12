@@ -5,10 +5,13 @@
   :author "Nick Patrick <npatrick04@gmail.com>"
   :license "MIT"
   :serial t
-  :depends-on (:esrap)
+  :depends-on (:named-readtables :split-sequence)
   :components ((:file "package")
 	       (:file "environment")
+               (:file "id")
                (:file "cl-dot")
-               (:file "print")
-	       (:file "read")))
+	       (:file "read")
+               (:file "eval")
+               ;; (:file "print")
+               ))
 
