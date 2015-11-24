@@ -4,19 +4,13 @@
   (:use #:cl ;; #:esrap
         )
   (:export
-   ;; #:id
-   
-   ;; #:get-attribute
-   ;; #:set-attribute
-   ;; #:get-ancillary-attribute
-   ;; #:set-ancillary-attribute
+   #:read-dot
+   #:read-dot-from-string
 
-   ;; #:subgraph
-   ;; #:graph
-   ;; #:digraph
-   ;; #:node
-   ;; #:edge
-
-   ;; #:get-node-by-id
+   #:subgraph
+   #:graph
+   #:digraph
+   #:node
+   #:edge
    ))
 

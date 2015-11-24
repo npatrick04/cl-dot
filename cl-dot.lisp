@@ -37,6 +37,15 @@
 (defclass digraph (graph)
   ())
 
+(defgeneric connector-style (graph)
+  (:documentation "The symbol for the connector of this style graph."))
+(defmethod connector-style (not-a-graph)
+  (error "This is not a graph! ~A" not-a-graph))
+(defmethod connector-style ((graph graph))
+  '--)
+(defmethod connector-style ((graph digraph))
+  '->)
+
 (defclass node (identified)
   ((node.env :accessor node.env
              :initarg :node.env
@@ -48,9 +57,16 @@
                  :documentation "The environment settings specific for this node.")
    (edges :accessor node-edges
           :initarg :edges
-          :initform ()))
-  ;; (:default-initargs id (error "Nodes need IDs"))
-  )
+          :initform ())))
+
+(defun lookup-node-attribute (id node &key (test #'eq))
+  "Get the node attribute, searching the node's specific environment
+first, then the node's creation environment."
+  (handler-case
+      (lookup id (specific.env node) :test test)
+    (lookup-failure (c)
+      (declare (ignore c))
+      (lookup id (node.env node) :test test))))
 
 (defclass edge ()
   ((edge.env :accessor edge.env
@@ -64,3 +80,25 @@
    (destination :reader destination
 		:initform (error "Need a destination")
 		:initarg :destination)))
+
+(defun make-digraph-edge (source destination specific-attributes edge.env)
+  (let ((edge (make-instance 'edge
+                             :destination destination
+                             :specific.env specific-attributes
+                             :edge.env edge.env)))
+    (push edge (node-edges source))
+    edge))
+
+(defun make-graph-edge (source destination specific-attributes edge.env)
+  (list (make-digraph-edge source destination specific-attributes edge.env)
+        (make-digraph-edge destination source specific-attributes edge.env)))
+
+(defun lookup-edge-attribute (id edge &key (test #'eq))
+  "Get the edge attribute, searching the edge's specific environment
+first, then the edge's creation environment."
+  (handler-case
+      (lookup id (specific.env edge) :test test)
+    (lookup-failure (c)
+      (declare (ignore c))
+      (lookup id (edge.env edge) :test test))))
+

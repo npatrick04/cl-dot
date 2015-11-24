@@ -39,6 +39,8 @@
     (string (let ((special-case (rassoc id special-ids)))
               (if special-case
                   (car special-case)
+                  ;; TODO: Don't intern into :cl-dot
+                  ;; Maybe after it works
                   (intern (string-upcase id) :cl-dot))))
     (symbol id)))
 
