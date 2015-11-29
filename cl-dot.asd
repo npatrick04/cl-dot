@@ -11,7 +11,6 @@
                (:file "id")
                (:file "cl-dot")
 	       (:file "read")
-               ;;(:file "eval")
                ;; (:file "print")
                ))
 
