@@ -1,18 +1,6 @@
 (in-package :cl-dot)
 (declaim (optimize debug))
 
-(defmacro with++ (var initial &body body)
-  (let ((incf-pre (intern (concatenate 'string
-                                       "++"
-                                       (symbol-name var))))
-        (incf-post (intern (concatenate 'string
-                                        (symbol-name var)
-                                        "++"))))
-    `(let ((,var ,initial))
-       (symbol-macrolet ((,incf-pre (incf ,var))
-                         (,incf-post (prog1 ,var (incf ,var))))
-         ,@body))))
-
 (defun evaluate-symbol (symb)
   ;; Here's where we lispify
   (if (is-valid-id (symbol-name symb))
@@ -130,21 +118,6 @@
                                         (graph.env subgraph)))))
                         (split-sequence:split-sequence end-of-statement e)))))
 
-(defun lookup-or-create-node (exp graph.env)
-  (let ((id (symbol->id exp))
-        (nodes (lookup 'nodes graph.env)))
-    (handler-case
-        (lookup exp nodes)
-      (lookup-failure (c)
-        (declare (ignore c))
-        (let ((node (make-instance 'node
-                                   :id id
-                                   :node.env (node.env (lookup
-                                                        'subgraph
-                                                        graph.env)))))
-          (update 'nodes graph.env (extend nodes exp node))
-          node)))))
-
 (define-constant +elements-for-graph+
   '((? strict)
     (or graph digraph)
@@ -192,34 +165,4 @@
              (error "Invalid graph")))
         graph))))
 
-(defun read-graph (stream)
-  "read and verify that the stream contains a graph type"
-  ;; Get strictness and graphiness
-  ;;(format t "Reading graph <readtable ~A>~%" *readtable*)
-  (evaluate-graph
-   (loop
-     for i from 1 to 4
-     for exp = (read stream)
-     collecting exp
-     while (atom exp))))
-
-(defun read-dot (stream)
-  (let ((original-readtable *readtable*))
-    (unwind-protect
-         (progn
-           (setf *readtable* *dot-readtable*)
-           (with-dot-readtable
-               (read-graph stream))
-           ;; (with-square-list-reading
-           ;;   (with-curly-reading
-           ;;     (with-equal-reading
-           ;;       (with-dot-comment-reading
-           ;;         (with-eos-reading #\;
-           ;;           (with-reader-macros ((#\- #'read-edge))
-           ;;             (read-graph stream)))))))
-           )
-      (setf *readtable* original-readtable))))
-
-(defun read-dot-from-string (string)
-  (read-dot (make-string-input-stream string)))
 

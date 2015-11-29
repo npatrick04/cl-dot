@@ -21,9 +21,6 @@
    (edge.env :accessor edge.env
              :initarg :edge.env
              :initform ())
-   (nodes :accessor nodes
-          :initarg :nodes
-          :initform ())
    (contents :accessor contents
              :initform ()
              :initarg :contents
@@ -45,6 +42,8 @@
   '--)
 (defmethod connector-style ((graph digraph))
   '->)
+(defmethod connector-style ((sg subgraph))
+  (connector-style (lookup 'graph (graph.env sg))))
 
 (defclass node (identified)
   ((node.env :accessor node.env
@@ -81,17 +80,16 @@ first, then the node's creation environment."
 		:initform (error "Need a destination")
 		:initarg :destination)))
 
-(defun make-digraph-edge (source destination specific-attributes edge.env)
+(defun make-digraph-edge (source destination edge.env)
   (let ((edge (make-instance 'edge
                              :destination destination
-                             :specific.env specific-attributes
                              :edge.env edge.env)))
     (push edge (node-edges source))
     edge))
 
-(defun make-graph-edge (source destination specific-attributes edge.env)
-  (list (make-digraph-edge source destination specific-attributes edge.env)
-        (make-digraph-edge destination source specific-attributes edge.env)))
+(defun make-graph-edge (source destination edge.env)
+  (list (make-digraph-edge source destination edge.env)
+        (make-digraph-edge destination source edge.env)))
 
 (defun lookup-edge-attribute (id edge &key (test #'eq))
   "Get the edge attribute, searching the edge's specific environment
@@ -101,4 +99,63 @@ first, then the edge's creation environment."
     (lookup-failure (c)
       (declare (ignore c))
       (lookup id (edge.env edge) :test test))))
+
+(defun lookup-or-create-node (exp graph.env)
+  (let ((id (symbol->id exp))
+        (nodes (lookup 'nodes graph.env)))
+    (handler-case
+        (lookup exp nodes)
+      (lookup-failure (c)
+        (declare (ignore c))
+        (let ((node (make-instance 'node
+                                   :id id
+                                   :node.env (node.env (lookup
+                                                        'subgraph
+                                                        graph.env)))))
+          (update 'nodes graph.env (extend nodes (lispify-symbol exp) node))
+          node)))))
+
+(defun make-edges (subgraph source dest)
+  (let ((sources (if (consp source)
+                     source
+                     (list source)))
+        (dests (if (consp dest)
+                   dest
+                   (list dest)))
+        (graph (lookup 'graph (graph.env subgraph)))
+        result)
+    (loop for source in sources
+          do (loop for dest in dests
+                   do (push (typecase graph
+                              (digraph (make-digraph-edge source dest (edge.env subgraph)))
+                              (graph   (make-graph-edge source dest (edge.env subgraph))))
+                            result))
+          finally (return result))))
+
+(defun edge-spec-nodes (edge)
+  (let (result)
+    (loop for lhs in edge by #'cddr
+          while lhs
+          do (typecase lhs
+               (node (pushnew lhs result))
+               (subgraph
+                (setf result (union (subgraph-nodes lhs)
+                                    result)))
+               (t (error "Edge must contain nodes or subgraphs")))
+          finally (return result))))
+
+(defun subgraph-nodes (subgraph)
+  (do ((result ())
+       (to-be-checked (contents subgraph) (cdr to-be-checked)))
+      ((null to-be-checked) result)
+    (cond
+      ((typep (car to-be-checked) 'node)
+       (push (car to-be-checked) result))
+      ((typep (car to-be-checked) 'subgraph)
+       (setf result (union (subgraph-nodes (car to-be-checked))
+                           result)))
+      ((eq (cadr to-be-checked)
+           (connector-style (lookup 'graph (graph.env subgraph))))
+       (setf result (union (edge-spec-nodes (car to-be-checked))
+                           result))))))
 

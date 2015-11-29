@@ -1,9 +1,5 @@
 (in-package :cl-dot)
 
-(defparameter env.graph ()) 
-(defparameter env.node ()) 
-(defparameter env.edge ()) 
-
 (define-condition lookup-failure (error)
   ((binding :reader binding :initarg :binding))
   (:report
