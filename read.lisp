@@ -235,6 +235,12 @@ of an edge statement, read the rest."
        (values nil (read-attribute-lists stream)))
       (t (values nil nil)))))
 
+(defun read-edge-statements (subgraph stream LHS)
+  "Let read-edge-stmt handle constructing the edges...this function adds 
+edge properties to the returned list."
+  (multiple-value-bind (edges props) (read-edge-stmt subgraph stream LHS)
+    (append edges (list props))))
+
 (defun read-possibly-identified-subgraph (subgraph stream)
   ;; This could be named...let's check
   (let* ((maybe-id (when (char/= (peek-char nil stream) #\{)
@@ -296,7 +302,7 @@ of an edge statement, read the rest."
                (let ((node (lookup-or-create-node first-things (graph.env subgraph))))
                  (if (char= (peek-char nil stream) #\-)
                      ;; It's got to be an edge!
-                     (cons node (read-edge-stmt subgraph stream node))
+                     (cons node (read-edge-statements subgraph stream node))
                      ;; It's got to be a node statement!
                      (progn
                        (when (char= (peek-char nil stream) #\[)
@@ -305,7 +311,7 @@ of an edge statement, read the rest."
         ;; It must be a subgraph!, read the edge if present.
         (if (char= (peek-char nil stream) #\-)
             ;; It's got to be an edge initiated by a subgraph!
-            (cons first-things (read-edge-stmt subgraph stream first-things))
+            (cons first-things (read-edge-statements subgraph stream first-things))
             first-things))))
 
 (defun read-statement-list (subgraph stream)

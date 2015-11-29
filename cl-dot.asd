@@ -11,6 +11,5 @@
                (:file "id")
                (:file "cl-dot")
 	       (:file "read")
-               ;; (:file "print")
-               ))
+               (:file "print")))
 

@@ -7,68 +7,74 @@
 (defvar *dot-print-type* 'dot
   "This variable determines how a graph object is printed.")
 
-(defun print-alist (alist stream &optional (bracket t))
+(defun print-alist (alist &optional (stream *standard-output*) (bracket t))
   (when alist
     (format stream "~:[~;[~]~{~A~^, ~}~:[~;]~]"
             bracket
             (loop for (attr . value) in alist
-               collect (format nil "~{~A=\"~A\"~}"
-                               (mapcar #'symbol->id (list attr value))))
+               collect (format nil "~A=~A" attr value))
             bracket)))
 
-;; (defun normalize-statement (statement)
-;;   (etypecase statement
-;;     (string
-;;      (let ((arrow (search "->" statement)))
-;;        (if arrow
-;;            (make-instance 'edge :nodes (list (normalize-statement
-;;                                               (subseq statement 0 arrow))
-;;                                              (normalize-statement
-;;                                               (subseq statement (+ 2 arrow)))))
-;;            (make-instance 'node :id (string-downcase statement)))))
-;;     (cons
-;;      (print-alist (list statement) nil nil))
-;;     (symbol
-;;      (normalize-statement (symbol-name statement)))))
+(defparameter *dot-print-level* 0)
+(defun incf-print-level (&optional (spaces 2))
+  (incf *dot-print-level* spaces))
+(defun decf-print-level (&optional (spaces 2))
+  (decf *dot-print-level* spaces))
+
+(declaim (inline print-spaces))
+(defun print-spaces (&optional (level *dot-print-level*))
+  (make-string level :initial-element #\Space))
+
+(defun print-edge (statement stream)
+  (loop for (LHS edge-op) on statement by #'cddr
+        do (progn
+             (typecase LHS
+               (node (write (id LHS) :stream stream))
+               (subgraph (write LHS :stream stream)))
+             (if (symbolp edge-op)
+                 (write edge-op :stream stream)
+                 (print-alist edge-op stream))))
+  (write-char #\; stream))
 
 (defmethod print-object ((object subgraph) stream)
   (case *dot-print-type*
     (unreadable
-     (print-unreadable-object (object stream :type t :identity t)))
+     (print-unreadable-object (object stream :type t :identity t)
+       (when (id object)
+         (write (id object) :stream stream))))
     (dot
-     (format stream
-             "~:[~;strict ~]~:[~:[subgraph~;graph~]~;~*digraph~] ~:[~;~:*~A ~]~%~
-           {~%~
-             ~:[~;  ~:*node ~A;~%~]~
-             ~:[~;  ~:*edge ~A;~%~]~
-             ~{  ~A;~%~}~
-           }~%"
-             (graph-strict object)
-             (typep object 'digraph)
-             (typep object 'graph)
-             (when (id object) (string-downcase (id object)))
-             (when (node-attrs object) (print-alist (node-attrs object) nil))
-             (when (edge-attrs object) (print-alist (edge-attrs object) nil))
-             (statements object)))))
+     (typecase object
+       (graph
+        (format stream "~@[strict ~]~(~A~) "
+                (graph-strict object)
+                (type-of object)))
+       (t (write-string "subgraph " stream)))
+     (when (id object)
+       (princ (id object) stream))
+     (format stream "~&~A{~%" (print-spaces))
+     (incf-print-level)
+     (dolist (statement (contents object))
+       (fresh-line stream)
+       (write-string (print-spaces) stream)
+       (if (consp statement)
+           (if (member (car statement) '(|edge| |node| |graph|))
+             (format stream "~A~@[~A~];~%"
+                     (car statement)
+                     (print-alist (cadr statement) nil))
+             (if (eq (cadr statement)
+                     (connector-style (lookup 'graph (graph.env object))))
+                 (print-edge statement stream)
+                 (error "How to print this? ~A" statement)))
+           (format stream "~A;~&" statement)))
+     (decf-print-level)
+     (format stream "~&~A}" (print-spaces)))))
 
-(defmethod print-object :after ((object environment) stream)
-  (case *dot-print-type*
-    (unreadable
-     (print-unreadable-object (object stream :type t :identity t)))
-    (dot
-     (print-alist (attributes object) stream))))
 (defmethod print-object ((object node) stream)
   (case *dot-print-type*
     (unreadable
-     (print-unreadable-object (object stream :type t :identity t)))
+     (print-unreadable-object (object stream :type t :identity t)
+       (write (id object) :stream stream)))
     (dot
-     (format stream "~A" (string-downcase (id object))))))
-(defmethod print-object ((object edge) stream)
-  (case *dot-print-type*
-    (unreadable
-     (print-unreadable-object (object stream :type t :identity t)))
-    (dot
-     (format stream "~A -> ~A"
-             (string-downcase (id (car (nodes object))))
-             (string-downcase (id (cadr (nodes object))))))))
-                                        ;TODO: add attributes
+     (format stream "~A~@[~A~]"
+             (id object)
+             (print-alist (specific.env object) nil)))))

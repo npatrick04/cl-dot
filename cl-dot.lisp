@@ -58,6 +58,10 @@
           :initarg :edges
           :initform ())))
 
+(defun node-attributes (node)
+  (append (specific.env node)
+          (node.env node)))
+
 (defun lookup-node-attribute (id node &key (test #'eq))
   "Get the node attribute, searching the node's specific environment
 first, then the node's creation environment."
