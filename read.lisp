@@ -200,15 +200,11 @@ character on #\[, so at least one a-list is present. "
       (read stream)
     (remove-whitespace stream)))
 
-(defun dotsym-read (stream)
-  (let ((s (read+ stream)))
-    (if (symbolp s)
-        (handler-case
-            (lispify-symbol s)
-          (error (c)
-            (declare (ignore c))
-            (signal 'stmt-read-failed)))
-        (signal 'stmt-read-failed))))
+(defgeneric get-nodes (element))
+(defmethod get-nodes ((sg subgraph))
+  (subgraph-nodes sg))
+(defmethod get-nodes ((node node))
+  (list node))
 
 (defun read-edge-stmt (subgraph stream LHS)
   "Given the current subgraph, a stream and the left-hand-side
@@ -217,15 +213,12 @@ of an edge statement, read the rest."
   (let ((beginning-of-edge (peek-char nil stream)))
     (case beginning-of-edge
       (#\-
-       (let ((edge-op (read+ stream)))
+       (let ((edge-op (read+ stream))
+             (RHS     (read+ stream)))
          (if (eq edge-op (connector-style subgraph))
-             (let ((RHS (read+ stream))
-                   (LHS-nodes (typecase LHS
-                                (node LHS)
-                                (subgraph (subgraph-nodes LHS)))))
-               (when (symbolp RHS) (setf RHS (lookup-or-create-node RHS
-                                                                    (graph.env subgraph))))
-               (let ((edges (make-edges subgraph LHS-nodes RHS)))
+             (let ((edges (make-edges subgraph
+                                      (get-nodes LHS)
+                                      (get-nodes RHS))))
                  (if (char/= (peek-char nil stream) #\;)
                      (multiple-value-bind (rest props) (read-edge-stmt subgraph stream RHS)
                        (when props
@@ -235,7 +228,7 @@ of an edge statement, read the rest."
                        (values (append (list edge-op RHS)
                                        rest)
                                props))
-                     (values (list edge-op RHS) nil))))
+                     (values (list edge-op RHS) nil)))
              (error "Bad edge op ~A" edge-op))))
       (#\[
        ;; properties
@@ -245,7 +238,7 @@ of an edge statement, read the rest."
 (defun read-possibly-identified-subgraph (subgraph stream)
   ;; This could be named...let's check
   (let* ((maybe-id (when (char/= (peek-char nil stream) #\{)
-                     (dotsym-read stream)))
+                     (read+ stream)))
          (*graph* (make-instance
                    'subgraph
                    :id (when (symbolp maybe-id) maybe-id)
@@ -329,15 +322,14 @@ and return a list of the contents."
 (defun read-graph (stream)
   "Read and verify that the stream contains a graph type"
   ;; Get strictness and graphiness
-  (let ((exp (lispify-symbol (read stream))))
-    (let* ((strictp (eq exp 'strict))
+  (let ((exp (read+ stream)))
+    (let* ((strictp (eq exp '|strict|))
            (graph-type (if strictp
                            ;; Need to read the graph type
-                           (lispify-symbol (read stream))
-                           exp)))
-      (remove-whitespace stream)
+                           (lispify-symbol (read+ stream))
+                           (lispify-symbol exp))))
       (let* ((graph-id (when (char/= (peek-char nil stream) #\{)
-                         (lispify-symbol (read stream))))
+                         (read+ stream)))
              (*graph* (make-instance
                        graph-type
                        :strict strictp
@@ -357,7 +349,6 @@ and return a list of the contents."
                       '(subgraph graph nodes)
                       (list *graph* *graph* nil)))
         ;; Set the contents of the graph to everything in the thing.
-        (remove-whitespace stream)
         (let ((next-char (read-char+ stream)))
           (if (char= next-char #\{)
               (setf (contents *graph*)

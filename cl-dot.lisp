@@ -101,14 +101,13 @@ first, then the edge's creation environment."
       (lookup id (edge.env edge) :test test))))
 
 (defun lookup-or-create-node (exp graph.env)
-  (let ((id (symbol->id exp))
-        (nodes (lookup 'nodes graph.env)))
+  (let ((nodes (lookup 'nodes graph.env)))
     (handler-case
         (lookup exp nodes)
       (lookup-failure (c)
         (declare (ignore c))
         (let ((node (make-instance 'node
-                                   :id id
+                                   :id exp
                                    :node.env (node.env (lookup
                                                         'subgraph
                                                         graph.env)))))
@@ -145,7 +144,7 @@ first, then the edge's creation environment."
           finally (return result))))
 
 (defun subgraph-nodes (subgraph)
-  (do ((result ())
+    (do ((result ())
        (to-be-checked (contents subgraph) (cdr to-be-checked)))
       ((null to-be-checked) result)
     (cond
@@ -154,7 +153,7 @@ first, then the edge's creation environment."
       ((typep (car to-be-checked) 'subgraph)
        (setf result (union (subgraph-nodes (car to-be-checked))
                            result)))
-      ((eq (cadr to-be-checked)
+      ((eq (cadar to-be-checked)
            (connector-style (lookup 'graph (graph.env subgraph))))
        (setf result (union (edge-spec-nodes (car to-be-checked))
                            result))))))
