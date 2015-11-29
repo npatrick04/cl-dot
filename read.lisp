@@ -294,9 +294,14 @@ edge properties to the returned list."
            ;(format t "otherwise...~%")
            (if (char= (peek-char nil stream) #\=)
                ;; Return an ID '=' ID statement
-               (progn
-                 (read-char+ stream)     ;eliminate the #\=
-                 (list (cons first-things (read+ stream))))
+               (let ((eq (read-char+ stream))     ;eliminate the #\=
+                     (value (read+ stream)))
+                 (declare (ignore eq))
+                 (setf (graph.env subgraph)
+                       (extend (graph.env subgraph)
+                               first-things
+                               value))
+                 (cons first-things value))
                ;; It's a node ID, so could be a node statement or edge statement.
                ;; Check if it's an edge...
                (let ((node (lookup-or-create-node first-things (graph.env subgraph))))

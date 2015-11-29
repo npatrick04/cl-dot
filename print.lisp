@@ -57,14 +57,19 @@
        (fresh-line stream)
        (write-string (print-spaces) stream)
        (if (consp statement)
-           (if (member (car statement) '(|edge| |node| |graph|))
-             (format stream "~A~@[~A~];~%"
-                     (car statement)
-                     (print-alist (cadr statement) nil))
-             (if (eq (cadr statement)
-                     (connector-style (lookup 'graph (graph.env object))))
-                 (print-edge statement stream)
-                 (error "How to print this? ~A" statement)))
+           (cond
+             ((member (car statement) '(|edge| |node| |graph|))
+              (format stream "~A~@[~A~];~%"
+                      (car statement)
+                      (print-alist (cadr statement) nil)))
+             ((and (consp (cdr statement))
+                   (eq (cadr statement)
+                       (connector-style (lookup 'graph (graph.env object)))))
+              (print-edge statement stream))
+             (t
+              ;; Not an attribute statement, subgraph, node or edge.
+              ;; It must be a bare ID = ID; form.
+              (format stream "~A = ~A;~%" (car statement) (cdr statement))))
            (format stream "~A;~&" statement)))
      (decf-print-level)
      (format stream "~&~A}" (print-spaces)))))
