@@ -1,0 +1,10 @@
+digraph test
+{
+        graph [label="blarg"]
+        [color=red]
+        style=dashed
+        node [shape=box]
+        subgraph cluster
+        {{foo bar->fib fact}}->subgraph cluster_fort{bloop {flooze}}
+        
+}
