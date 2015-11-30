@@ -113,22 +113,33 @@ newline has been encountered."
         newline?)
     (read-char stream t nil t)))
 
+(defun read-dot-string (stream open-char)
+  (let ((buf (make-array 10
+                         :element-type 'character
+                         :adjustable t
+                         :fill-pointer 0)))
+    (loop (let ((char (read-char stream)))
+            (if (eq char open-char)
+                (return (coerce buf 'string))
+                (vector-push-extend char buf 10))))))
+
 (defun read-attribute-lists (stream)
   "read one or more attribution lists. This is started by a macro
 character on #\[, so at least one a-list is present. "
   ;; Read the first alist, then subsequent alists
-  (do ((alist (read-attribute-list stream)
-              (append alist (read-attribute-list stream)))
-       ;; As long as the next character after the last alist
-       (next-char (peek-char nil stream t nil t) (peek-char nil stream t nil t)))
-      ;; is still regarding an alist.
-      ((char/= next-char #\[)
-       ;(format t "In read-attribute-lists, got ~A~%" alist)
-       ;; Then return the set of concatenated alists.
-       alist)
-    ;; (format t "In read-attribute-lists, got ~A, reading again when next-char == ~A~%"
-    ;;         alist next-char)
-    ))
+  (with-reader-macros ((#\" #'read-dot-string))
+    (do ((alist (read-attribute-list stream)
+                (append alist (read-attribute-list stream)))
+         ;; As long as the next character after the last alist
+         (next-char (peek-char nil stream t nil t) (peek-char nil stream t nil t)))
+        ;; is still regarding an alist.
+        ((char/= next-char #\[)
+                                        ;(format t "In read-attribute-lists, got ~A~%" alist)
+         ;; Then return the set of concatenated alists.
+         alist)
+      ;; (format t "In read-attribute-lists, got ~A, reading again when next-char == ~A~%"
+      ;;         alist next-char)
+      )))
 
 ;; (defmacro with-square-list-reading (&body body)
 ;;   `(with-reader-macros ((#\[ #'read-attribute-lists)
@@ -215,6 +226,8 @@ of an edge statement, read the rest."
       (#\-
        (let ((edge-op (read+ stream))
              (RHS     (read+ stream)))
+         (when (symbolp RHS)
+           (setf RHS (lookup-or-create-node RHS (graph.env subgraph))))
          (if (eq edge-op (connector-style subgraph))
              (let ((edges (make-edges subgraph
                                       (get-nodes LHS)

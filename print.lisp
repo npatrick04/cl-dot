@@ -12,7 +12,7 @@
     (format stream "~:[~;[~]~{~A~^, ~}~:[~;]~]"
             bracket
             (loop for (attr . value) in alist
-               collect (format nil "~A=~A" attr value))
+                  collect (format nil "~A=\"~A\"" attr value))
             bracket)))
 
 (defparameter *dot-print-level* 0)
@@ -29,10 +29,10 @@
   (loop for (LHS edge-op) on statement by #'cddr
         do (progn
              (typecase LHS
-               (node (write (id LHS) :stream stream))
+               (node (princ (symbol-name (id LHS)) stream))
                (subgraph (write LHS :stream stream)))
              (if (symbolp edge-op)
-                 (write edge-op :stream stream)
+                 (princ edge-op stream)
                  (print-alist edge-op stream))))
   (write-char #\; stream))
 
@@ -69,7 +69,7 @@
              (t
               ;; Not an attribute statement, subgraph, node or edge.
               ;; It must be a bare ID = ID; form.
-              (format stream "~A = ~A;~%" (car statement) (cdr statement))))
+              (format stream "~A=\"~A\";~%" (car statement) (cdr statement))))
            (format stream "~A;~&" statement)))
      (decf-print-level)
      (format stream "~&~A}" (print-spaces)))))
@@ -81,5 +81,5 @@
        (write (id object) :stream stream)))
     (dot
      (format stream "~A~@[~A~]"
-             (id object)
+             (symbol-name (id object))
              (print-alist (specific.env object) nil)))))

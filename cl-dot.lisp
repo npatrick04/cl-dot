@@ -105,9 +105,10 @@ first, then the edge's creation environment."
       (lookup id (edge.env edge) :test test))))
 
 (defun lookup-or-create-node (exp graph.env)
-  (let ((nodes (lookup 'nodes graph.env)))
+  (let ((id (lispify-symbol exp))
+        (nodes (lookup 'nodes graph.env)))
     (handler-case
-        (lookup exp nodes)
+        (lookup id nodes)
       (lookup-failure (c)
         (declare (ignore c))
         (let ((node (make-instance 'node
@@ -115,7 +116,7 @@ first, then the edge's creation environment."
                                    :node.env (node.env (lookup
                                                         'subgraph
                                                         graph.env)))))
-          (update 'nodes graph.env (extend nodes (lispify-symbol exp) node))
+          (update 'nodes graph.env (extend nodes id node))
           node)))))
 
 (defun make-edges (subgraph source dest)
