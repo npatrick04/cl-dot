@@ -1,10 +1,10 @@
 (in-package #:cl-dot)
 
 (deftype graph-print-method ()
-  '(member unreadable dot))
+  '(member :unreadable :dot))
 
 (declaim (type graph-print-method *dot-print-type*))
-(defvar *dot-print-type* 'dot
+(defvar *dot-print-type* :dot
   "This variable determines how a graph object is printed.")
 
 (defun print-alist (alist &optional (stream *standard-output*) (bracket t))
@@ -31,18 +31,18 @@
              (typecase LHS
                (node (princ (symbol-name (id LHS)) stream))
                (subgraph (write LHS :stream stream)))
-             (if (symbolp edge-op)
-                 (princ edge-op stream)
-                 (print-alist edge-op stream))))
+             (and edge-op (if (symbolp edge-op)
+                              (princ edge-op stream)
+                              (print-alist edge-op stream)))))
   (write-char #\; stream))
 
 (defmethod print-object ((object subgraph) stream)
   (case *dot-print-type*
-    (unreadable
+    (:unreadable
      (print-unreadable-object (object stream :type t :identity t)
        (when (id object)
          (write (id object) :stream stream))))
-    (dot
+    (:dot
      (typecase object
        (graph
         (format stream "~@[strict ~]~(~A~) "
@@ -76,10 +76,10 @@
 
 (defmethod print-object ((object node) stream)
   (case *dot-print-type*
-    (unreadable
+    (:unreadable
      (print-unreadable-object (object stream :type t :identity t)
        (write (id object) :stream stream)))
-    (dot
+    (:dot
      (format stream "~A~@[~A~]"
              (symbol-name (id object))
              (print-alist (specific.env object) nil)))))

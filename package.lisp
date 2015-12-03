@@ -1,8 +1,9 @@
 ;;;; package.lisp
 
 (defpackage #:cl-dot
-  (:use #:cl #:with++ #:accum)
+  (:use #:cl #:accum)
   (:export
+   #:*dot-print-type*
    #:read-dot
    #:read-dot-from-string
 

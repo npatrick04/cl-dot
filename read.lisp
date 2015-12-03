@@ -252,7 +252,9 @@ of an edge statement, read the rest."
   "Let read-edge-stmt handle constructing the edges...this function adds 
 edge properties to the returned list."
   (multiple-value-bind (edges props) (read-edge-stmt subgraph stream LHS)
-    (append edges (list props))))
+    (if props
+        (append edges (list props))
+        edges)))
 
 (defun read-possibly-identified-subgraph (subgraph stream)
   ;; This could be named...let's check
