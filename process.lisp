@@ -38,3 +38,13 @@
 (def-output gif gif-file)
 (def-output imap imap-file)
 (def-output cmapx cmapx-file)
+
+;;; User-specified output in the case that others are supported via plugin or something else.
+(defun render-output (graph type &optional (file (format nil "~(out.~A~)" type)))
+  "Generate files of type by passing as a -Ttype argument to the *dot-program*.
+type may be a symbol or string that is passed as -T with lowercase."
+  (uiop/run-program:run-program (list *dot-program*
+                                      (format nil "-T~(~A~)" type)
+                                      "-o" file)
+                                :output nil
+                                :input (generate-dot-input graph)))

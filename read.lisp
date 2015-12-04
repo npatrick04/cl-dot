@@ -60,28 +60,12 @@
 (defvar *graph* nil
   "The current subgraph being constructed.")
 
-(defun plist-to-alist (plist)
-  "Not tail recursive"
-  (declare (optimize debug))
-  (if (cdr plist)
-      (if (eq (cadr plist) the-equal-flag)
-          (if (cdddr plist)
-              (cons (cons (car plist) (caddr plist))
-                    (plist-to-alist (cdddr plist)))
-              (cons (cons (car plist) (caddr plist))
-                    nil))
-          (error "Malformed association list"))
-      (if (car plist)
-          (error "bad number of elements")
-          ())))
-
 (defun read-char+ (stream)
   (prog1 (read-char stream)
     (remove-whitespace stream)))
 
 (defun read-attribute-list (stream)
   "[id1 = something; id2=else] => '((id1 . something) (id2 . else))"
-  ;; (plist-to-alist (read-delimited-list #\] stream))
   (when (char/= (read-char+ stream) #\[)
     (error "read-attribute-list isn't reading an attribute list..."))
   (do ((result ()))
@@ -94,10 +78,6 @@
           (push (cons attr (read+ stream))
                 result)
           (error "Unexpected result reading attribute list ~A" eq?)))))
-
-(defmacro define-constant (name value &optional doc)
-  `(defconstant ,name (if (boundp ',name) (symbol-value ',name) ,value)
-     ,@(when doc (list doc))))
 
 (define-constant +whitespace+
     '(#\Space #\Return #\Newline #\Vt #\Page #\Tab))
@@ -281,7 +261,7 @@ edge properties to the returned list."
     (return-from read-statement (read-char stream)))
   ;; Get things started
   (let ((first-things (read+ stream)))
-    ;(print first-things)
+    ;; (print first-things)
     (if (symbolp first-things)
         (case first-things
           ((|graph| |node| |edge|)
@@ -393,6 +373,10 @@ and return a list of the contents."
 
 (defun read-dot-from-string (string)
   (read-dot (make-string-input-stream string)))
+
+(defun read-dot-from-file (file)
+  (with-open-file (in file)
+    (read-dot in)))
 
 #|
 

@@ -5,7 +5,8 @@
   :author "Nick Patrick <npatrick04@gmail.com>"
   :license "MIT"
   :serial t
-  :depends-on (:named-readtables :split-sequence :accum)
+  :depends-on (:named-readtables :split-sequence :accum
+                                 :alexandria)
   :components ((:file "package")
 	       (:file "environment")
                (:file "id")
