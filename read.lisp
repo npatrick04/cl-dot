@@ -263,27 +263,28 @@ edge properties to the returned list."
   ;; Get things started
   (let ((first-things (read+ stream)))
     (if (symbolp first-things)
-        (case first-things
-          ((|graph| |node| |edge|)
+        (cond
+          ((member first-things '("graph" "node" "edge")
+                   :test #'string=)
            (if (char= (peek-char nil stream) #\[)
                (let ((result (read-attribute-lists stream)))
-                 (ecase first-things
-                   (|graph| (setf (graph.env subgraph)
-                                  (extend (graph.env subgraph)
-                                          (mapcar #'car result)
-                                          (mapcar #'cdr result))))
-                   (|node| (setf (node.env subgraph)
-                                 (extend (node.env subgraph)
-                                         (mapcar #'car result)
-                                         (mapcar #'cdr result))))
-                   (|edge| (setf (edge.env subgraph)
-                                 (extend (edge.env subgraph)
-                                         (mapcar #'car result)
-                                         (mapcar #'cdr result)))))
+                 (cond
+                   ((string= first-things "graph") (setf (graph.env subgraph)
+                                                         (extend (graph.env subgraph)
+                                                                 (mapcar #'car result)
+                                                                 (mapcar #'cdr result))))
+                   ((string= first-things "node") (setf (node.env subgraph)
+                                                        (extend (node.env subgraph)
+                                                                (mapcar #'car result)
+                                                                (mapcar #'cdr result))))
+                   ((string= first-things "edge") (setf (edge.env subgraph)
+                                                        (extend (edge.env subgraph)
+                                                                (mapcar #'car result)
+                                                                (mapcar #'cdr result)))))
                  (list first-things result))
                (error "Expecting #\[ at position ~d"
                       (file-position stream))))
-          ((|subgraph|)
+          ((string= first-things "SUBGRAPH")
            (read-possibly-identified-subgraph subgraph stream))
           (t ;; It's an ID for sure...but what kind of ID?
            (if (char= (peek-char nil stream) #\=)
@@ -328,7 +329,7 @@ and return a list of the contents."
   "Read and verify that the stream contains a graph type"
   ;; Get strictness and graphiness
   (let ((exp (read+ stream)))
-    (let* ((strictp (eq exp '|strict|))
+    (let* ((strictp (string= (symbol-name exp) "STRICT"))
            (graph-type (if strictp
                            ;; Need to read the graph type
                            (lispify-symbol (read+ stream))
@@ -362,14 +363,12 @@ and return a list of the contents."
         *graph*))))
 
 (defun read-dot (stream)
-  ;; Is this legal or ok?
-  (in-package :cl-dot)
   (let ((original-readtable *readtable*))
     (unwind-protect
          (progn
            (setf *readtable* *dot-readtable*)
            (with-dot-readtable
-               (read-graph stream)))
+             (read-graph stream)))
       (setf *readtable* original-readtable))))
 
 (defun read-dot-from-string (string)

@@ -58,7 +58,10 @@
        (write-string (print-spaces) stream)
        (if (consp statement)
            (cond
-             ((member (car statement) '(|edge| |node| |graph|))
+             ((and (symbolp (car statement))
+                   (member (symbol-name (car statement))
+                           '("edge" "node" "graph")
+                           :test #'string=))
               (format stream "~A~@[~A~];~%"
                       (car statement)
                       (print-alist (cadr statement) nil)))
