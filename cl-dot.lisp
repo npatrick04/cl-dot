@@ -4,8 +4,6 @@
 
 (in-package #:cl-dot)
 
-(declaim (optimize debug))
-
 ;;; "cl-dot" goes here. Hacks and glory await!
 
 (defclass identified ()
@@ -59,6 +57,7 @@
           :initform ())))
 
 (defun node-attributes (node)
+  "Get a list of all node attributes, including inherited ones."
   (append (specific.env node)
           (node.env node)))
 
@@ -85,6 +84,7 @@ first, then the node's creation environment."
 		:initarg :destination)))
 
 (defun make-digraph-edge (source destination edge.env)
+  (declare (type node source destination))
   (let ((edge (make-instance 'edge
                              :destination destination
                              :edge.env edge.env)))
@@ -92,6 +92,7 @@ first, then the node's creation environment."
     edge))
 
 (defun make-graph-edge (source destination edge.env)
+  (declare (type node source destination))
   (list (make-digraph-edge source destination edge.env)
         (make-digraph-edge destination source edge.env)))
 
@@ -120,6 +121,10 @@ first, then the edge's creation environment."
           node)))))
 
 (defun make-edges (subgraph source dest)
+  "Given a subgraph into which to make edges...
+Add edges between source (being a node or list of nodes)
+and dest (being a node or list of nodes).
+This does NOT modify the contents of subgraph."
   (let ((sources (if (consp source)
                      source
                      (list source)))
@@ -135,6 +140,21 @@ first, then the edge's creation environment."
                               (graph   (make-graph-edge source dest (edge.env subgraph))))
                             result))
           finally (return result))))
+
+(defun make-edges-in-subgraph (subgraph source dest &optional attributes)
+  (let ((edges (make-edges subgraph source dest)))
+    (let ((new-content
+            (accum edge-def
+              (edge-def source)
+              (edge-def (connector-style subgraph))
+              (edge-def dest)
+              (when attributes
+                ;; Define the attributes in the edge object
+                (mapcar (lambda (edge)
+                          (setf (specific.env edge) attributes))
+                        edges)
+                (edge-def attributes)))))
+      (appendf (contents subgraph) (list new-content)))))
 
 (defun edge-spec-nodes (edge)
   (let (result)

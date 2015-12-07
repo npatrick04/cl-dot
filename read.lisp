@@ -80,7 +80,8 @@
           (error "Unexpected result reading attribute list ~A" eq?)))))
 
 (define-constant +whitespace+
-    '(#\Space #\Return #\Newline #\Vt #\Page #\Tab))
+    '(#\Space #\Return #\Newline #\Vt #\Page #\Tab)
+  :test #'equalp)
 
 (defun remove-whitespace (stream)
   "Remove whitespace from the stream, returning t when at least one
@@ -212,16 +213,16 @@ of an edge statement, read the rest."
              (let ((edges (make-edges subgraph
                                       (get-nodes LHS)
                                       (get-nodes RHS))))
-                 (if (char/= (peek-char nil stream) #\;)
-                     (multiple-value-bind (rest props) (read-edge-stmt subgraph stream RHS)
-                       (when props
-                         (mapc (lambda (edge)
-                                 (setf (specific.env edge) props))
-                               edges))
-                       (values (append (list edge-op RHS)
-                                       rest)
-                               props))
-                     (values (list edge-op RHS) nil)))
+               (if (char/= (peek-char nil stream) #\;)
+                   (multiple-value-bind (rest props) (read-edge-stmt subgraph stream RHS)
+                     (when props
+                       (mapc (lambda (edge)
+                               (setf (specific.env edge) props))
+                             edges))
+                     (values (append (list edge-op RHS)
+                                     rest)
+                             props))
+                   (values (list edge-op RHS) nil)))
              (error "Bad edge op ~A" edge-op))))
       (#\[
        ;; properties
@@ -261,7 +262,6 @@ edge properties to the returned list."
     (return-from read-statement (read-char stream)))
   ;; Get things started
   (let ((first-things (read+ stream)))
-    ;; (print first-things)
     (if (symbolp first-things)
         (case first-things
           ((|graph| |node| |edge|)
@@ -270,23 +270,22 @@ edge properties to the returned list."
                  (ecase first-things
                    (|graph| (setf (graph.env subgraph)
                                   (extend (graph.env subgraph)
-                                          first-things
-                                          result)))
+                                          (mapcar #'car result)
+                                          (mapcar #'cdr result))))
                    (|node| (setf (node.env subgraph)
                                  (extend (node.env subgraph)
-                                         first-things
-                                         result)))
+                                         (mapcar #'car result)
+                                         (mapcar #'cdr result))))
                    (|edge| (setf (edge.env subgraph)
                                  (extend (edge.env subgraph)
-                                         first-things
-                                         result))))
+                                         (mapcar #'car result)
+                                         (mapcar #'cdr result)))))
                  (list first-things result))
                (error "Expecting #\[ at position ~d"
                       (file-position stream))))
           ((|subgraph|)
            (read-possibly-identified-subgraph subgraph stream))
           (t ;; It's an ID for sure...but what kind of ID?
-           ;(format t "otherwise...~%")
            (if (char= (peek-char nil stream) #\=)
                ;; Return an ID '=' ID statement
                (let ((eq (read-char+ stream))     ;eliminate the #\=
@@ -363,6 +362,8 @@ and return a list of the contents."
         *graph*))))
 
 (defun read-dot (stream)
+  ;; Is this legal or ok?
+  (in-package :cl-dot)
   (let ((original-readtable *readtable*))
     (unwind-protect
          (progn

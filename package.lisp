@@ -3,7 +3,8 @@
 (defpackage #:cl-dot
   (:use #:cl #:accum)
   (:import-from #:alexandria
-                #:define-constant)
+                #:define-constant
+                #:appendf)
   (:export
    #:*dot-print-type*
    #:read-dot
@@ -14,5 +15,22 @@
    #:graph
    #:digraph
    #:node
-   #:edge))
+   #:edge
+
+   #:id
+   #:graph.env
+   #:node.env
+   #:edge.env
+   #:contents
+   #:graph-strict
+   #:specific.env
+   #:edges
+
+   #:make-edges-in-subgraph
+   #:get-nodes
+
+   #:lookup-node-attribute
+   #:node-attributes
+
+   #:connector-style))
 
