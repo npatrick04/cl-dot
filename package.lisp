@@ -11,6 +11,9 @@
    #:read-dot-from-string
    #:read-dot-from-file
 
+   ;; The reader macro, actually kind of cool
+   #:set-dot-reader-macro
+
    #:subgraph
    #:graph
    #:digraph

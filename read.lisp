@@ -378,6 +378,26 @@ and return a list of the contents."
   (with-open-file (in file)
     (read-dot in)))
 
+(defun dot-reader-macro (stream sub-char numarg)
+  (declare (ignore sub-char numarg))
+  (read-dot stream))
+
+(defun set-dot-reader-macro (&optional (char #\D))
+  "Set the specified (defaults to #\D) # dispatch character
+to read a graph from the stream.
+e.g.
+CL-DOT> #d digraph {foo->bar;}
+digraph 
+{
+  foo->bar;
+}
+CL-DOT> #dgraph {foo -- bar -- baz}
+graph 
+{
+  foo--bar--baz;
+}"
+  (set-dispatch-macro-character #\# char #'dot-reader-macro))
+
 #|
 
 (cl-dot:read-dot-from-string "
