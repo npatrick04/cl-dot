@@ -1,7 +1,7 @@
 ;;;; package.lisp
 
 (defpackage #:cl-dot
-  (:use #:cl #:accum)
+  (:use #:cl #:accum #:iterate)
   (:import-from #:alexandria
                 #:define-constant
                 #:appendf)

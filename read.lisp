@@ -219,10 +219,9 @@ of an edge statement, read the rest."
                        (mapc (lambda (edge)
                                (setf (specific.env edge) props))
                              edges))
-                     (values (append (list edge-op RHS)
-                                     rest)
+                     (values (cons RHS rest)
                              props))
-                   (values (list edge-op RHS) nil)))
+                   (values (cons RHS nil) nil)))
              (error "Bad edge op ~A" edge-op))))
       (#\[
        ;; properties
@@ -233,9 +232,10 @@ of an edge statement, read the rest."
   "Let read-edge-stmt handle constructing the edges...this function adds 
 edge properties to the returned list."
   (multiple-value-bind (edges props) (read-edge-stmt subgraph stream LHS)
-    (if props
-        (append edges (list props))
-        edges)))
+    (make-instance 'edge-set
+                   :edges      (cons LHS edges)
+                   :attributes props
+                   :style      (connector-style subgraph))))
 
 (defun read-possibly-identified-subgraph (subgraph stream)
   ;; This could be named...let's check
@@ -302,7 +302,7 @@ edge properties to the returned list."
                (let ((node (lookup-or-create-node first-things (graph.env subgraph))))
                  (if (char= (peek-char nil stream) #\-)
                      ;; It's got to be an edge!
-                     (cons node (read-edge-statements subgraph stream node))
+                     (read-edge-statements subgraph stream node)
                      ;; It's got to be a node statement!
                      (progn
                        (when (char= (peek-char nil stream) #\[)

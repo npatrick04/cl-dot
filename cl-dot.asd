@@ -6,7 +6,7 @@
   :license "MIT"
   :serial t
   :depends-on (:named-readtables :split-sequence :accum
-                                 :alexandria)
+                                 :alexandria :iterate)
   :components ((:file "package")
 	       (:file "environment")
                (:file "id")

@@ -32,16 +32,15 @@
 (defclass digraph (graph)
   ())
 
+(define-constant +the-graph-connector+   '--)
+(define-constant +the-digraph-connector+ '->)
+
 (defgeneric connector-style (graph)
   (:documentation "The symbol for the connector of this style graph."))
-(defmethod connector-style (not-a-graph)
-  (error "This is not a graph! ~A" not-a-graph))
-(defmethod connector-style ((graph graph))
-  '--)
-(defmethod connector-style ((graph digraph))
-  '->)
-(defmethod connector-style ((sg subgraph))
-  (connector-style (lookup 'graph (graph.env sg))))
+(defmethod connector-style (not-a-graph)     (error "This is not a graph! ~A" not-a-graph))
+(defmethod connector-style ((graph graph))   +the-graph-connector+)
+(defmethod connector-style ((graph digraph)) +the-digraph-connector+)
+(defmethod connector-style ((sg subgraph))   (connector-style (lookup 'graph (graph.env sg))))
 
 (defclass node (identified)
   ((node.env :accessor node.env
@@ -83,18 +82,19 @@ first, then the node's creation environment."
 		:initform (error "Need a destination")
 		:initarg :destination)))
 
-(defun make-digraph-edge (source destination edge.env)
+(defun make-digraph-edge (source destination edge.env &optional specific.env)
   (declare (type node source destination))
   (let ((edge (make-instance 'edge
-                             :destination destination
-                             :edge.env edge.env)))
+                             :destination  destination
+                             :edge.env     edge.env
+                             :specific.env specific.env)))
     (push edge (node-edges source))
     edge))
 
-(defun make-graph-edge (source destination edge.env)
+(defun make-graph-edge (source destination edge.env &optional specific.env)
   (declare (type node source destination))
-  (list (make-digraph-edge source destination edge.env)
-        (make-digraph-edge destination source edge.env)))
+  (list (make-digraph-edge source destination edge.env specific.env)
+        (make-digraph-edge destination source edge.env specific.env)))
 
 (defun lookup-edge-attribute (id edge &key (test #'eq))
   "Get the edge attribute, searching the edge's specific environment
@@ -120,7 +120,7 @@ first, then the edge's creation environment."
           (update 'nodes graph.env (extend nodes id node))
           node)))))
 
-(defun make-edges (subgraph source dest)
+(defun make-edges (subgraph source dest &optional attributes)
   "Given a subgraph into which to make edges...
 Add edges between source (being a node or list of nodes)
 and dest (being a node or list of nodes).
@@ -132,29 +132,28 @@ This does NOT modify the contents of subgraph."
                    dest
                    (list dest)))
         (graph (lookup 'graph (graph.env subgraph)))
-        result)
-    (loop for source in sources
-          do (loop for dest in dests
-                   do (push (typecase graph
-                              (digraph (make-digraph-edge source dest (edge.env subgraph)))
-                              (graph   (make-graph-edge source dest (edge.env subgraph))))
-                            result))
-          finally (return result))))
+        (edges ()))
+    (iter (for source in sources)
+          (iter (for dest in dests)
+                (push (typecase graph
+                        (digraph (make-digraph-edge source dest (edge.env subgraph) attributes))
+                        (graph   (make-graph-edge source dest (edge.env subgraph) attributes)))
+                      edges))
+          (finally (return edges)))))
+
+(defclass edge-set ()
+  ((edges :accessor edge-set-edges
+          :initarg  :edges)
+   (attributes :accessor edge-set-attributes
+               :initarg  :attributes
+               :initform ())
+   (style :accessor edge-set-style
+          :initarg  :style)))
 
 (defun make-edges-in-subgraph (subgraph source dest &optional attributes)
-  (let ((edges (make-edges subgraph source dest)))
-    (let ((new-content
-            (accum edge-def
-              (edge-def source)
-              (edge-def (connector-style subgraph))
-              (edge-def dest)
-              (when attributes
-                ;; Define the attributes in the edge object
-                (mapcar (lambda (edge)
-                          (setf (specific.env edge) attributes))
-                        edges)
-                (edge-def attributes)))))
-      (appendf (contents subgraph) (list new-content)))))
+  (let ((edges (make-edges subgraph source dest attributes)))
+    (appendf (contents subgraph))
+    edges))
 
 (defun edge-spec-nodes (edge)
   (let (result)

@@ -36,8 +36,25 @@
                               (print-alist edge-op stream)))))
   (write-char #\; stream))
 
+(defmethod print-object ((es edge-set) stream)
+  (ecase *dot-print-type*
+    (:unreadable
+     (print-unreadable-object (es stream :type t :identity t)))
+    (:dot
+     (let ((format-string (ccase (edge-set-style es)
+                            (-- "~{~A~^--~}~@[~A~]")
+                            (-> "~{~A~^->~}~@[~A~]"))))
+       (format stream format-string
+               (mapcar (lambda (obj)
+                         (etypecase obj
+                           ;; Nodes cannot display attributes in an edge
+                           (node (id obj))
+                           (subgraph obj)))
+                       (edge-set-edges es))
+               (print-alist (edge-set-attributes es) nil))))))
+
 (defmethod print-object ((object subgraph) stream)
-  (case *dot-print-type*
+  (ecase *dot-print-type*
     (:unreadable
      (print-unreadable-object (object stream :type t :identity t)
        (when (id object)
@@ -78,7 +95,7 @@
      (format stream "~&~A}" (print-spaces)))))
 
 (defmethod print-object ((object node) stream)
-  (case *dot-print-type*
+  (ecase *dot-print-type*
     (:unreadable
      (print-unreadable-object (object stream :type t :identity t)
        (write (id object) :stream stream)))
